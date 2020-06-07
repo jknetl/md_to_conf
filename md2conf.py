@@ -57,6 +57,10 @@ PARSER.add_argument('-l', '--loglevel', default='INFO',
                     help='Use this option to set the log verbosity.')
 PARSER.add_argument('-s', '--simulate', action='store_true', default=False,
                     help='Use this option to only show conversion result.')
+PARSER.add_argument('-r', '--requireAttachments', action='store_true', default=False,
+                    help='Require all attachments to exists and fail if any attachment couldn\'t be found.')
+PARSER.add_argument('-k', '--skipUpdate', action='store_true', default=False,
+                    help='Do not overwrite a page if it already exists.')
 
 
 ARGS = PARSER.parse_args()
@@ -78,6 +82,8 @@ try:
     ATTACHMENTS = ARGS.attachment
     GO_TO_PAGE = not ARGS.nogo
     CONTENTS = ARGS.contents
+    FAIL_ON_NOT_FOUND = ARGS.requireAttachments
+    UPDATE_IF_EXISTS = not ARGS.skipUpdate
 
     if USERNAME is None:
         LOGGER.error('Error: Username not specified by environment variable or option.')
@@ -575,8 +581,12 @@ def upload_attachment(page_id, file, comment):
     filename = os.path.basename(file)
 
     if not os.path.isfile(file):
-        LOGGER.error('File %s cannot be found --> skip ', file)
-        return False
+        if FAIL_ON_NOT_FOUND:
+            LOGGER.error('File %s cannot be found --> Exiting. You can ignore failures by runing script with -i argument', file)
+            sys.exit(2)
+        else:
+            LOGGER.error('File %s cannot be found --> skip ', file)
+            return False
 
     file_to_upload = {
         'comment': comment,
@@ -659,7 +669,10 @@ def main():
         ancestors = []
 
     if page:
-        update_page(page.id, title, html, page.version, ancestors, ATTACHMENTS)
+        if (UPDATE_IF_EXISTS):
+            update_page(page.id, title, html, page.version, ancestors, ATTACHMENTS)
+        else:
+            LOGGER.info('Page already exists. Skipping update.');      
     else:
         create_page(title, html, ancestors)
 
